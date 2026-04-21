@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Printable timesheet for work at EBF in Rafz — Tomorrow Biostasis GmbH." />
+    <title>Timesheet · Tomorrow Biostasis GmbH</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Tailwind CSS (Play CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- React + Babel (inline JSX, no build step) -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+
+      .ts-root,
+      .ts-root input,
+      .ts-root button,
+      .ts-root label,
+      .ts-root th,
+      .ts-root td {
+        font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        font-feature-settings: 'ss01', 'cv11';
+      }
+      .font-display {
+        font-family: 'Instrument Serif', Georgia, 'Times New Roman', serif;
+        font-weight: 400;
+      }
+      .tabular {
+        font-variant-numeric: tabular-nums;
+      }
+      .ts-root input[type='date'],
+      .ts-root input[type='time'] {
+        font-variant-numeric: tabular-nums;
+      }
+
+      @media print {
+        @page {
+          size: A4;
+          margin: 12mm;
+        }
+        html,
+        body {
+          background: white !important;
+        }
+        .no-print {
+          display: none !important;
+        }
+        .sheet {
+          box-shadow: none !important;
+          border: none !important;
+          margin: 0 !important;
+          max-width: 100% !important;
+        }
+        .ts-root input,
+        .ts-root textarea {
+          border: none !important;
+          background: transparent !important;
+          padding: 0 !important;
+          color: #0a0a0a !important;
+          -webkit-text-fill-color: #0a0a0a !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script type="text/babel" data-presets="react">
+      const { useState } = React;
+
+      // --- Inline SVG icons (lucide-style) ---
+      const IconPlus = ({ size = 13, strokeWidth = 2 }) => (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M5 12h14" /><path d="M12 5v14" />
+        </svg>
+      );
+
+      const IconX = ({ size = 14, strokeWidth = 1.5 }) => (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M18 6 6 18" /><path d="m6 6 12 12" />
+        </svg>
+      );
+
+      const IconPrinter = ({ size = 13, strokeWidth = 2 }) => (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="6 9 6 2 18 2 18 9" />
+          <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+          <rect width="12" height="8" x="6" y="14" />
+        </svg>
+      );
+
+      // --- Small helpers ---
+      function Field({ label, value, onChange, placeholder }) {
+        return (
+          <div>
+            <label className="block text-[10px] uppercase tracking-[0.25em] text-stone-500 mb-1">
+              {label}
+            </label>
+            <input
+              type="text"
+              value={value}
+              placeholder={placeholder}
+              onChange={e => onChange(e.target.value)}
+              className="w-full bg-transparent border-b border-stone-300 focus:border-stone-900 outline-none py-1 text-sm text-stone-900 transition-colors placeholder:text-stone-300"
+            />
+          </div>
+        );
+      }
+
+      function TimeCell({ value, onChange, leftBorder }) {
+        return (
+          <td className={`py-2 px-2 ${leftBorder ? 'border-l border-stone-200' : ''}`}>
+            <input
+              type="time"
+              value={value}
+              onChange={e => onChange(e.target.value)}
+              className="bg-transparent outline-none border-none text-stone-900 w-full min-w-[80px]"
+            />
+          </td>
+        );
+      }
+
+      // --- Main component ---
+      function App() {
+        const [employee, setEmployee] = useState({ name: '', period: '' });
+        const [entries, setEntries] = useState([createEntry()]);
+
+        function createEntry() {
+          return {
+            id: Math.random().toString(36).slice(2, 10),
+            date: '', ms: '', me: '', as: '', ae: '',
+          };
+        }
+
+        const parseTime = t => {
+          if (!t || !t.includes(':')) return null;
+          const [h, m] = t.split(':').map(Number);
+          if (isNaN(h) || isNaN(m)) return null;
+          return h * 60 + m;
+        };
+
+        const entryMinutes = e => {
+          const ms = parseTime(e.ms);
+          const me = parseTime(e.me);
+          const as = parseTime(e.as);
+          const ae = parseTime(e.ae);
+          let total = 0;
+          if (ms !== null && me !== null && me > ms) total += me - ms;
+          if (as !== null && ae !== null && ae > as) total += ae - as;
+          return total;
+        };
+
+        const fmtHM = mins => {
+          if (!mins) return '—';
+          const h = Math.floor(mins / 60);
+          const m = mins % 60;
+          return `${h}:${m.toString().padStart(2, '0')}`;
+        };
+
+        const decimalH = mins => (mins / 60).toFixed(2);
+
+        const weekday = dateStr => {
+          if (!dateStr) return '';
+          const d = new Date(dateStr);
+          if (isNaN(d)) return '';
+          return d.toLocaleDateString('en-GB', { weekday: 'short' });
+        };
+
+        const totalMinutes = entries.reduce((s, e) => s + entryMinutes(e), 0);
+
+        const addEntry = () => setEntries([...entries, createEntry()]);
+        const removeEntry = id => {
+          if (entries.length === 1) { setEntries([createEntry()]); return; }
+          setEntries(entries.filter(e => e.id !== id));
+        };
+        const updateEntry = (id, field, val) => {
+          setEntries(entries.map(e => (e.id === id ? { ...e, [field]: val } : e)));
+        };
+
+        return (
+          <div className="min-h-screen w-full bg-stone-100 print:bg-white">
+            <div className="ts-root max-w-4xl mx-auto px-4 py-6 md:py-10 text-stone-900">
+              {/* Top controls */}
+              <div className="no-print flex flex-wrap items-center justify-between gap-3 mb-5">
+                <div className="text-[10px] uppercase tracking-[0.25em] text-stone-500">
+                  Timesheet · Tomorrow Biostasis
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={addEntry}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] uppercase tracking-[0.15em] border border-stone-900 text-stone-900 hover:bg-stone-900 hover:text-white transition-colors"
+                  >
+                    <IconPlus /> Add day
+                  </button>
+                  <button
+                    onClick={() => window.print()}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] uppercase tracking-[0.15em] bg-stone-900 text-white hover:bg-black transition-colors"
+                  >
+                    <IconPrinter /> Print / Save PDF
+                  </button>
+                </div>
+              </div>
+
+              {/* Sheet */}
+              <div className="sheet bg-white border border-stone-200 shadow-xl shadow-stone-900/5">
+                <div className="px-7 md:px-14 py-10 md:py-14">
+                  {/* Header */}
+                  <header className="flex items-start justify-between pb-6 border-b border-stone-900 gap-6">
+                    <div className="min-w-0">
+                      <div className="text-[10px] uppercase tracking-[0.25em] text-stone-500 mb-2">
+                        Rafz · Switzerland
+                      </div>
+                      <h1 className="font-display text-[28px] md:text-[38px] leading-[1] tracking-tight text-stone-900">
+                        Tomorrow Biostasis GmbH
+                      </h1>
+                      <p className="mt-1.5 text-xs md:text-sm text-stone-500 italic">
+                        Time sheet for work at EBF in Rafz
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="text-[10px] uppercase tracking-[0.25em] text-stone-500 mb-1">
+                        Document
+                      </div>
+                      <div className="font-display text-2xl md:text-3xl leading-none">
+                        Timesheet
+                      </div>
+                      <div className="text-[10px] text-stone-400 mt-2 tabular uppercase tracking-widest">
+                        Monthly record
+                      </div>
+                    </div>
+                  </header>
+
+                  {/* Employee info */}
+                  <section className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-5 mt-8 mb-10">
+                    <Field
+                      label="Employee Name"
+                      value={employee.name}
+                      onChange={v => setEmployee({ ...employee, name: v })}
+                    />
+                    <Field
+                      label="Period"
+                      value={employee.period}
+                      onChange={v => setEmployee({ ...employee, period: v })}
+                      placeholder="e.g. April 2026"
+                    />
+                  </section>
+
+                  {/* Entries */}
+                  <section className="overflow-x-auto -mx-2 px-2">
+                    <table className="w-full text-sm tabular min-w-[640px]">
+                      <thead>
+                        <tr className="text-left border-b-2 border-stone-900 text-stone-900">
+                          <th rowSpan={2} className="py-2 pr-3 font-medium text-[10px] uppercase tracking-[0.15em] align-bottom">
+                            Date
+                          </th>
+                          <th colSpan={2} className="py-2 px-2 font-medium text-[10px] uppercase tracking-[0.15em] text-center border-l border-stone-300">
+                            Morning
+                          </th>
+                          <th colSpan={2} className="py-2 px-2 font-medium text-[10px] uppercase tracking-[0.15em] text-center border-l border-stone-300">
+                            Afternoon
+                          </th>
+                          <th rowSpan={2} className="py-2 pl-2 font-medium text-[10px] uppercase tracking-[0.15em] text-right border-l border-stone-300 align-bottom">
+                            Hours
+                          </th>
+                          <th rowSpan={2} className="no-print w-8"></th>
+                        </tr>
+                        <tr className="text-left border-b border-stone-300 text-stone-500">
+                          <th className="py-1.5 px-2 font-normal text-[9px] uppercase tracking-[0.15em] border-l border-stone-300">Start</th>
+                          <th className="py-1.5 px-2 font-normal text-[9px] uppercase tracking-[0.15em]">End</th>
+                          <th className="py-1.5 px-2 font-normal text-[9px] uppercase tracking-[0.15em] border-l border-stone-300">Start</th>
+                          <th className="py-1.5 px-2 font-normal text-[9px] uppercase tracking-[0.15em]">End</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {entries.map(e => {
+                          const mins = entryMinutes(e);
+                          const wd = weekday(e.date);
+                          return (
+                            <tr key={e.id} className="border-b border-stone-200 hover:bg-stone-50/60 group transition-colors">
+                              <td className="py-2 pr-3">
+                                <div className="flex items-baseline gap-2">
+                                  <input
+                                    type="date"
+                                    value={e.date}
+                                    onChange={ev => updateEntry(e.id, 'date', ev.target.value)}
+                                    className="bg-transparent outline-none text-stone-900 border-none w-[130px]"
+                                  />
+                                  {wd && (
+                                    <span className="text-[9px] uppercase tracking-[0.15em] text-stone-400">
+                                      {wd}
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <TimeCell value={e.ms} onChange={v => updateEntry(e.id, 'ms', v)} leftBorder />
+                              <TimeCell value={e.me} onChange={v => updateEntry(e.id, 'me', v)} />
+                              <TimeCell value={e.as} onChange={v => updateEntry(e.id, 'as', v)} leftBorder />
+                              <TimeCell value={e.ae} onChange={v => updateEntry(e.id, 'ae', v)} />
+                              <td className="py-2 pl-2 text-right border-l border-stone-200 text-stone-900 font-medium tabular">
+                                {fmtHM(mins)}
+                              </td>
+                              <td className="no-print w-8 text-right">
+                                <button
+                                  onClick={() => removeEntry(e.id)}
+                                  className="opacity-30 group-hover:opacity-100 text-stone-400 hover:text-red-600 transition p-1"
+                                  title="Remove day"
+                                >
+                                  <IconX />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                      <tfoot>
+                        <tr className="border-t-2 border-stone-900">
+                          <td colSpan={5} className="py-3 pr-2 text-right text-[10px] uppercase tracking-[0.2em] text-stone-700 font-medium">
+                            Total&nbsp;&nbsp;·&nbsp;&nbsp;{decimalH(totalMinutes)}&nbsp;h decimal
+                          </td>
+                          <td className="py-3 pl-2 text-right border-l border-stone-300 font-semibold text-stone-900 tabular">
+                            {fmtHM(totalMinutes)}
+                          </td>
+                          <td className="no-print"></td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </section>
+
+                  {/* Declaration */}
+                  <section className="mt-10 pt-5 border-t border-stone-200">
+                    <p className="text-[11px] leading-relaxed text-stone-600 max-w-2xl">
+                      I hereby confirm that the hours recorded above accurately reflect
+                      the time I worked at EBF in Rafz during the period stated. Times
+                      are recorded in 24-hour format (HH:MM). Lunch and other unpaid
+                      breaks are excluded from the total.
+                    </p>
+                  </section>
+
+                  {/* Signatures */}
+                  <section className="grid grid-cols-1 md:grid-cols-2 gap-10 mt-8">
+                    <div>
+                      <div className="text-[10px] uppercase tracking-[0.25em] text-stone-500 mb-2">
+                        Employee Signature
+                      </div>
+                      <div className="h-28 border-b border-stone-400"></div>
+                      <div className="mt-3 flex items-baseline gap-4">
+                        <span className="text-[10px] uppercase tracking-[0.25em] text-stone-500 shrink-0">Date</span>
+                        <div className="flex-1 max-w-[170px] border-b border-stone-300 h-5"></div>
+                      </div>
+                      <div className="mt-3 text-[10px] uppercase tracking-[0.25em] text-stone-400">
+                        {employee.name || 'Name'}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-[10px] uppercase tracking-[0.25em] text-stone-500 mb-2">
+                        Supervisor Signature
+                      </div>
+                      <div className="h-28 border-b border-stone-400"></div>
+                      <div className="mt-3 flex items-baseline gap-4">
+                        <span className="text-[10px] uppercase tracking-[0.25em] text-stone-500 shrink-0">Date</span>
+                        <div className="flex-1 max-w-[170px] border-b border-stone-300 h-5"></div>
+                      </div>
+                      <div className="mt-3 text-[10px] uppercase tracking-[0.25em] text-stone-400">
+                        Name
+                      </div>
+                    </div>
+                  </section>
+
+                  {/* Footer */}
+                  <footer className="mt-12 pt-4 border-t border-stone-200 flex items-center justify-between text-[9px] uppercase tracking-[0.25em] text-stone-400">
+                    <span>Tomorrow Biostasis GmbH</span>
+                    <span className="tabular">Page 1 / 1</span>
+                  </footer>
+                </div>
+              </div>
+
+              {/* Helper hint */}
+              <div className="no-print mt-6 text-center text-[11px] text-stone-400 leading-relaxed">
+                Fill in the fields, then print the sheet — signatures are done by hand on
+                the printed page.
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+  </body>
+</html>
