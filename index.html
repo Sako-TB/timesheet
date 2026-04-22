@@ -161,6 +161,24 @@
         </svg>
       );
 
+      const IconCalc = ({ size = 13, strokeWidth = 2 }) => (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+          <rect width="16" height="20" x="4" y="2" rx="2" />
+          <line x1="8" x2="16" y1="6" y2="6" />
+          <line x1="16" x2="16" y1="14" y2="18" />
+          <path d="M16 10h.01" /><path d="M12 10h.01" /><path d="M8 10h.01" />
+          <path d="M12 14h.01" /><path d="M8 14h.01" /><path d="M12 18h.01" /><path d="M8 18h.01" />
+        </svg>
+      );
+
+      const IconCheck = ({ size = 13, strokeWidth = 2.5 }) => (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M20 6 9 17l-5-5" />
+        </svg>
+      );
+
       // --- Helpers ---
       const gen = () => Math.random().toString(36).slice(2, 10);
 
@@ -392,17 +410,24 @@
         const [employees, setEmployees] = useState([{ id: gen(), name: '' }]);
         const [period, setPeriod] = useState('');
         const [entries, setEntries] = useState([createEntry()]);
+        const [calculated, setCalculated] = useState(false);
 
         function createEntry() {
           return { id: gen(), date: '', ms: '', me: '', as: '', ae: '' };
         }
 
-        // --- Time calculations ---
+        // --- Time calculations (tolerant to 24h and 12h AM/PM formats) ---
         const parseTime = t => {
-          if (!t || !t.includes(':')) return null;
-          const [h, m] = t.split(':').map(Number);
-          if (isNaN(h) || isNaN(m)) return null;
-          return h * 60 + m;
+          if (!t) return null;
+          const m = String(t).trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+          if (!m) return null;
+          let hours = parseInt(m[1], 10);
+          const mins = parseInt(m[2], 10);
+          const ampm = m[3] ? m[3].toUpperCase() : null;
+          if (isNaN(hours) || isNaN(mins)) return null;
+          if (ampm === 'AM' && hours === 12) hours = 0;
+          else if (ampm === 'PM' && hours !== 12) hours += 12;
+          return hours * 60 + mins;
         };
 
         const entryMinutes = e => {
@@ -435,11 +460,13 @@
         const totalMinutes = entries.reduce((s, e) => s + entryMinutes(e), 0);
 
         // --- Entry ops ---
-        const addEntry = () => setEntries(prev => [...prev, createEntry()]);
+        const addEntry = () => { setCalculated(false); setEntries(prev => [...prev, createEntry()]); };
         const removeEntry = id => {
+          setCalculated(false);
           setEntries(prev => prev.length === 1 ? [createEntry()] : prev.filter(e => e.id !== id));
         };
         const updateEntry = (id, field, val) => {
+          setCalculated(false);
           setEntries(prev => prev.map(e => (e.id === id ? { ...e, [field]: val } : e)));
         };
 
@@ -462,16 +489,33 @@
                 <div className="text-[10px] uppercase tracking-[0.25em] text-stone-500">
                   Timesheet · Tomorrow Biostasis
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-center">
                   <button
                     onClick={addEntry}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] uppercase tracking-[0.15em] border border-stone-900 text-stone-900 hover:bg-stone-900 hover:text-white transition-colors"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] uppercase tracking-[0.15em] border border-stone-300 text-stone-700 hover:border-stone-900 hover:text-stone-900 transition-colors"
                   >
                     <IconPlus /> Add day
                   </button>
                   <button
-                    onClick={() => window.print()}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] uppercase tracking-[0.15em] bg-stone-900 text-white hover:bg-black transition-colors"
+                    onClick={() => setCalculated(true)}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] uppercase tracking-[0.15em] border transition-colors ${
+                      calculated
+                        ? 'border-emerald-600 bg-emerald-600 text-white'
+                        : 'border-stone-900 text-stone-900 hover:bg-stone-900 hover:text-white'
+                    }`}
+                  >
+                    {calculated ? <IconCheck /> : <IconCalc />}
+                    {calculated ? 'Calculated' : 'Calculate hours'}
+                  </button>
+                  <button
+                    onClick={() => { setCalculated(true); setTimeout(() => window.print(), 50); }}
+                    disabled={!calculated}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] uppercase tracking-[0.15em] transition-colors ${
+                      calculated
+                        ? 'bg-stone-900 text-white hover:bg-black'
+                        : 'bg-stone-300 text-stone-500 cursor-not-allowed'
+                    }`}
+                    title={calculated ? 'Print / save PDF' : 'Click Calculate hours first'}
                   >
                     <IconPrinter /> Print / Save PDF
                   </button>
@@ -554,9 +598,11 @@
 
               {/* Helper hint */}
               <div className="no-print mt-6 text-center text-[11px] text-stone-400 leading-relaxed">
-                {multi
-                  ? `${employees.length} A4 pages will be printed — one per employee. Signatures are done by hand on each printed page.`
-                  : 'Fill in the fields, then print — signatures are done by hand on the printed page.'}
+                {calculated
+                  ? (multi
+                      ? `${employees.length} A4 pages ready — one per employee. Click Print / Save PDF.`
+                      : 'Hours calculated. Click Print / Save PDF when ready.')
+                  : 'Fill in the days and times, then click Calculate hours before printing.'}
               </div>
             </div>
           </div>
