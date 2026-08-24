@@ -1,0 +1,668 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Printable timesheet for work at EBF in Rafz — Tomorrow Biostasis GmbH." />
+    <title>Timesheet · Tomorrow Biostasis GmbH</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Tailwind CSS (Play CDN) -->
+    <script src="https://cdn.tailwindcss.com/3.4.16"></script>
+
+    <!-- React + Babel (inline JSX, no build step) -->
+    <script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+
+      .ts-root,
+      .ts-root input,
+      .ts-root button,
+      .ts-root label,
+      .ts-root th,
+      .ts-root td {
+        font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        font-feature-settings: 'ss01', 'cv11';
+      }
+      .font-display {
+        font-family: 'Instrument Serif', Georgia, 'Times New Roman', serif;
+        font-weight: 400;
+      }
+      .tabular {
+        font-variant-numeric: tabular-nums;
+      }
+      .ts-root input[type='date'],
+      .ts-root input[type='time'] {
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* Screen-only fallback: hide printable-only bits */
+      .only-print {
+        display: none;
+      }
+
+      @media print {
+        @page {
+          size: A4;
+          margin: 10mm 12mm;
+        }
+        html,
+        body {
+          background: white !important;
+        }
+        .no-print {
+          display: none !important;
+        }
+        .only-print {
+          display: block !important;
+        }
+        .sheet {
+          box-shadow: none !important;
+          border: none !important;
+          margin: 0 !important;
+          max-width: 100% !important;
+          width: 100% !important;
+          page-break-inside: avoid;
+          break-inside: avoid;
+        }
+        .sheet-break {
+          page-break-after: always;
+          break-after: page;
+        }
+        /* Keep text crisp but DO NOT strip intentional borders (border-b utilities) */
+        .ts-root input,
+        .ts-root textarea {
+          background: transparent !important;
+          color: #0a0a0a !important;
+          -webkit-text-fill-color: #0a0a0a !important;
+        }
+        /* Hide browser date/time picker chrome (calendar/clock icons, spinners) */
+        .ts-root input::-webkit-calendar-picker-indicator,
+        .ts-root input::-webkit-inner-spin-button,
+        .ts-root input::-webkit-clear-button {
+          display: none !important;
+          -webkit-appearance: none !important;
+          appearance: none !important;
+        }
+        /* Hide text input placeholders on print */
+        .ts-root input::placeholder {
+          color: transparent !important;
+          opacity: 0 !important;
+        }
+        /* Tighten everything for A4 single-page fit */
+        .ts-root {
+          max-width: 100% !important;
+          padding: 0 !important;
+        }
+        .ts-root .print-pad {
+          padding: 4mm 6mm !important;
+        }
+        .ts-root table {
+          min-width: 0 !important;
+          width: 100% !important;
+        }
+        .ts-root .overflow-x-auto {
+          overflow: visible !important;
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script>
+const {
+  useState
+} = React;
+
+// --- Inline SVG icons ---
+const IconPlus = ({
+  size = 13,
+  strokeWidth = 2
+}) => /*#__PURE__*/React.createElement("svg", {
+  width: size,
+  height: size,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: strokeWidth,
+  strokeLinecap: "round",
+  strokeLinejoin: "round"
+}, /*#__PURE__*/React.createElement("path", {
+  d: "M5 12h14"
+}), /*#__PURE__*/React.createElement("path", {
+  d: "M12 5v14"
+}));
+const IconX = ({
+  size = 14,
+  strokeWidth = 1.5
+}) => /*#__PURE__*/React.createElement("svg", {
+  width: size,
+  height: size,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: strokeWidth,
+  strokeLinecap: "round",
+  strokeLinejoin: "round"
+}, /*#__PURE__*/React.createElement("path", {
+  d: "M18 6 6 18"
+}), /*#__PURE__*/React.createElement("path", {
+  d: "m6 6 12 12"
+}));
+const IconPrinter = ({
+  size = 13,
+  strokeWidth = 2
+}) => /*#__PURE__*/React.createElement("svg", {
+  width: size,
+  height: size,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: strokeWidth,
+  strokeLinecap: "round",
+  strokeLinejoin: "round"
+}, /*#__PURE__*/React.createElement("polyline", {
+  points: "6 9 6 2 18 2 18 9"
+}), /*#__PURE__*/React.createElement("path", {
+  d: "M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"
+}), /*#__PURE__*/React.createElement("rect", {
+  width: "12",
+  height: "8",
+  x: "6",
+  y: "14"
+}));
+const IconUser = ({
+  size = 12,
+  strokeWidth = 1.8
+}) => /*#__PURE__*/React.createElement("svg", {
+  width: size,
+  height: size,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: strokeWidth,
+  strokeLinecap: "round",
+  strokeLinejoin: "round"
+}, /*#__PURE__*/React.createElement("path", {
+  d: "M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"
+}), /*#__PURE__*/React.createElement("circle", {
+  cx: "12",
+  cy: "7",
+  r: "4"
+}));
+const IconCalc = ({
+  size = 13,
+  strokeWidth = 2
+}) => /*#__PURE__*/React.createElement("svg", {
+  width: size,
+  height: size,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: strokeWidth,
+  strokeLinecap: "round",
+  strokeLinejoin: "round"
+}, /*#__PURE__*/React.createElement("rect", {
+  width: "16",
+  height: "20",
+  x: "4",
+  y: "2",
+  rx: "2"
+}), /*#__PURE__*/React.createElement("line", {
+  x1: "8",
+  x2: "16",
+  y1: "6",
+  y2: "6"
+}), /*#__PURE__*/React.createElement("line", {
+  x1: "16",
+  x2: "16",
+  y1: "14",
+  y2: "18"
+}), /*#__PURE__*/React.createElement("path", {
+  d: "M16 10h.01"
+}), /*#__PURE__*/React.createElement("path", {
+  d: "M12 10h.01"
+}), /*#__PURE__*/React.createElement("path", {
+  d: "M8 10h.01"
+}), /*#__PURE__*/React.createElement("path", {
+  d: "M12 14h.01"
+}), /*#__PURE__*/React.createElement("path", {
+  d: "M8 14h.01"
+}), /*#__PURE__*/React.createElement("path", {
+  d: "M12 18h.01"
+}), /*#__PURE__*/React.createElement("path", {
+  d: "M8 18h.01"
+}));
+const IconCheck = ({
+  size = 13,
+  strokeWidth = 2.5
+}) => /*#__PURE__*/React.createElement("svg", {
+  width: size,
+  height: size,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: strokeWidth,
+  strokeLinecap: "round",
+  strokeLinejoin: "round"
+}, /*#__PURE__*/React.createElement("path", {
+  d: "M20 6 9 17l-5-5"
+}));
+
+// --- Helpers ---
+const gen = () => Math.random().toString(36).slice(2, 10);
+function TimeCell({
+  value,
+  onChange,
+  leftBorder
+}) {
+  return /*#__PURE__*/React.createElement("td", {
+    className: `py-1.5 print:py-1 px-1.5 ${leftBorder ? 'border-l border-stone-200' : ''}`
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "time",
+    value: value,
+    onChange: e => onChange(e.target.value),
+    className: "bg-transparent outline-none border-none text-stone-900 w-full min-w-0 text-[13px] print:text-[11px]"
+  }));
+}
+
+// --- The printable timesheet, one per employee ---
+function TimesheetSheet(props) {
+  const {
+    employee,
+    updateEmployeeName,
+    period,
+    setPeriod,
+    entries,
+    addEntry,
+    removeEntry,
+    updateEntry,
+    entryMinutes,
+    totalMinutes,
+    fmtHM,
+    decimalH,
+    weekday,
+    readOnly
+  } = props;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "sheet bg-white border border-stone-200 shadow-xl shadow-stone-900/5"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "print-pad px-6 md:px-12 py-8 md:py-10"
+  }, /*#__PURE__*/React.createElement("header", {
+    className: "flex items-start justify-between pb-4 print:pb-2 border-b border-stone-900 gap-6"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "min-w-0"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-[10px] uppercase tracking-[0.25em] text-stone-500 mb-1.5"
+  }, "Rafz \xB7 Switzerland"), /*#__PURE__*/React.createElement("h1", {
+    className: "font-display text-[26px] md:text-[34px] print:text-[26px] leading-[1] tracking-tight text-stone-900"
+  }, "Tomorrow Biostasis GmbH"), /*#__PURE__*/React.createElement("p", {
+    className: "mt-1 text-xs md:text-sm print:text-[11px] text-stone-500 italic"
+  }, "Time sheet for work at EBF in Rafz")), /*#__PURE__*/React.createElement("div", {
+    className: "text-right shrink-0"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-[10px] uppercase tracking-[0.25em] text-stone-500 mb-0.5"
+  }, "Document"), /*#__PURE__*/React.createElement("div", {
+    className: "font-display text-xl md:text-2xl print:text-xl leading-none"
+  }, "Timesheet"), /*#__PURE__*/React.createElement("div", {
+    className: "text-[10px] text-stone-400 mt-1 tabular uppercase tracking-widest"
+  }, "Monthly record"))), /*#__PURE__*/React.createElement("section", {
+    className: "grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-4 mt-5 mb-5 print:mt-3 print:mb-3"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    className: "block text-[10px] uppercase tracking-[0.25em] text-stone-500 mb-0.5"
+  }, "Employee Name"), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    value: employee.name,
+    readOnly: readOnly,
+    onChange: e => updateEmployeeName && updateEmployeeName(e.target.value),
+    className: "w-full bg-transparent border-b border-stone-300 focus:border-stone-900 outline-none py-0.5 text-sm print:text-[13px] text-stone-900 transition-colors placeholder:text-stone-300"
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    className: "block text-[10px] uppercase tracking-[0.25em] text-stone-500 mb-0.5"
+  }, "Period"), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    value: period,
+    readOnly: readOnly,
+    onChange: e => setPeriod && setPeriod(e.target.value),
+    placeholder: "e.g. April 2026",
+    className: "w-full bg-transparent border-b border-stone-300 focus:border-stone-900 outline-none py-0.5 text-sm print:text-[13px] text-stone-900 transition-colors placeholder:text-stone-300"
+  }))), /*#__PURE__*/React.createElement("section", null, /*#__PURE__*/React.createElement("table", {
+    className: "w-full text-sm tabular table-fixed"
+  }, /*#__PURE__*/React.createElement("colgroup", null, /*#__PURE__*/React.createElement("col", {
+    style: {
+      width: '25%'
+    }
+  }), /*#__PURE__*/React.createElement("col", {
+    style: {
+      width: '14%'
+    }
+  }), /*#__PURE__*/React.createElement("col", {
+    style: {
+      width: '14%'
+    }
+  }), /*#__PURE__*/React.createElement("col", {
+    style: {
+      width: '14%'
+    }
+  }), /*#__PURE__*/React.createElement("col", {
+    style: {
+      width: '14%'
+    }
+  }), /*#__PURE__*/React.createElement("col", {
+    style: {
+      width: '14%'
+    }
+  }), /*#__PURE__*/React.createElement("col", {
+    className: "no-print",
+    style: {
+      width: '5%'
+    }
+  })), /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", {
+    className: "text-left border-b-2 border-stone-900 text-stone-900"
+  }, /*#__PURE__*/React.createElement("th", {
+    rowSpan: 2,
+    className: "py-1.5 pr-2 font-medium text-[10px] uppercase tracking-[0.12em] align-bottom"
+  }, "Date"), /*#__PURE__*/React.createElement("th", {
+    colSpan: 2,
+    className: "py-1.5 px-1 font-medium text-[10px] uppercase tracking-[0.12em] text-center border-l border-stone-300"
+  }, "Morning"), /*#__PURE__*/React.createElement("th", {
+    colSpan: 2,
+    className: "py-1.5 px-1 font-medium text-[10px] uppercase tracking-[0.12em] text-center border-l border-stone-300"
+  }, "Afternoon"), /*#__PURE__*/React.createElement("th", {
+    rowSpan: 2,
+    className: "py-1.5 pl-1.5 font-medium text-[10px] uppercase tracking-[0.12em] text-right border-l border-stone-300 align-bottom"
+  }, "Hours"), /*#__PURE__*/React.createElement("th", {
+    rowSpan: 2,
+    className: "no-print"
+  })), /*#__PURE__*/React.createElement("tr", {
+    className: "text-left border-b border-stone-300 text-stone-500"
+  }, /*#__PURE__*/React.createElement("th", {
+    className: "py-1 px-1.5 font-normal text-[9px] uppercase tracking-[0.12em] border-l border-stone-300"
+  }, "Start"), /*#__PURE__*/React.createElement("th", {
+    className: "py-1 px-1.5 font-normal text-[9px] uppercase tracking-[0.12em]"
+  }, "End"), /*#__PURE__*/React.createElement("th", {
+    className: "py-1 px-1.5 font-normal text-[9px] uppercase tracking-[0.12em] border-l border-stone-300"
+  }, "Start"), /*#__PURE__*/React.createElement("th", {
+    className: "py-1 px-1.5 font-normal text-[9px] uppercase tracking-[0.12em]"
+  }, "End"))), /*#__PURE__*/React.createElement("tbody", null, entries.map(e => {
+    const mins = entryMinutes(e);
+    const wd = weekday(e.date);
+    return /*#__PURE__*/React.createElement("tr", {
+      key: e.id,
+      className: "border-b border-stone-200 hover:bg-stone-50/60 group transition-colors"
+    }, /*#__PURE__*/React.createElement("td", {
+      className: "py-1.5 print:py-1 pr-2"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flex items-baseline gap-1.5"
+    }, /*#__PURE__*/React.createElement("input", {
+      type: "date",
+      value: e.date,
+      readOnly: readOnly,
+      onChange: ev => updateEntry && updateEntry(e.id, 'date', ev.target.value),
+      className: "bg-transparent outline-none text-stone-900 border-none text-[13px] print:text-[11px] min-w-0 w-full max-w-[120px]"
+    }), wd && /*#__PURE__*/React.createElement("span", {
+      className: "text-[9px] uppercase tracking-[0.12em] text-stone-400 shrink-0"
+    }, wd))), /*#__PURE__*/React.createElement(TimeCell, {
+      value: e.ms,
+      onChange: v => updateEntry && updateEntry(e.id, 'ms', v),
+      leftBorder: true
+    }), /*#__PURE__*/React.createElement(TimeCell, {
+      value: e.me,
+      onChange: v => updateEntry && updateEntry(e.id, 'me', v)
+    }), /*#__PURE__*/React.createElement(TimeCell, {
+      value: e.as,
+      onChange: v => updateEntry && updateEntry(e.id, 'as', v),
+      leftBorder: true
+    }), /*#__PURE__*/React.createElement(TimeCell, {
+      value: e.ae,
+      onChange: v => updateEntry && updateEntry(e.id, 'ae', v)
+    }), /*#__PURE__*/React.createElement("td", {
+      className: "py-1.5 print:py-1 pl-1.5 text-right border-l border-stone-200 text-stone-900 font-medium tabular text-[13px] print:text-[11px]"
+    }, fmtHM(mins)), /*#__PURE__*/React.createElement("td", {
+      className: "no-print text-right"
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: () => removeEntry && removeEntry(e.id),
+      className: "opacity-30 group-hover:opacity-100 text-stone-400 hover:text-red-600 transition p-1",
+      title: "Remove day"
+    }, /*#__PURE__*/React.createElement(IconX, null))));
+  })), /*#__PURE__*/React.createElement("tfoot", null, /*#__PURE__*/React.createElement("tr", {
+    className: "border-t-2 border-stone-900"
+  }, /*#__PURE__*/React.createElement("td", {
+    colSpan: 5,
+    className: "py-2 print:py-1.5 pr-2 text-right text-[11px] uppercase tracking-[0.15em] text-stone-900 font-medium"
+  }, "Total Hours"), /*#__PURE__*/React.createElement("td", {
+    className: "py-2 print:py-1.5 pl-1.5 text-right border-l border-stone-300 font-semibold text-stone-900 tabular text-[14px] print:text-[13px]"
+  }, fmtHM(totalMinutes)), /*#__PURE__*/React.createElement("td", {
+    className: "no-print"
+  }))))), /*#__PURE__*/React.createElement("section", {
+    className: "mt-5 pt-3 print:mt-3 print:pt-2 border-t border-stone-200"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-[11px] print:text-[10px] leading-snug text-stone-600 max-w-2xl"
+  }, "I hereby confirm that the hours recorded above accurately reflect the time I worked at EBF in Rafz during the period stated. Times are recorded in 24-hour format (HH:MM). Lunch and other unpaid breaks are excluded from the total.")), /*#__PURE__*/React.createElement("section", {
+    className: "grid grid-cols-2 gap-10 mt-5 print:mt-4"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "text-[10px] uppercase tracking-[0.25em] text-stone-500 mb-1.5"
+  }, "Employee Signature"), /*#__PURE__*/React.createElement("div", {
+    className: "h-20 print:h-14 border-b border-stone-400"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "mt-2 flex items-baseline gap-3"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] uppercase tracking-[0.25em] text-stone-500 shrink-0"
+  }, "Date"), /*#__PURE__*/React.createElement("div", {
+    className: "flex-1 max-w-[160px] border-b border-stone-300 h-4"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "mt-2 text-[10px] uppercase tracking-[0.25em] text-stone-400"
+  }, employee.name || 'Name')), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "text-[10px] uppercase tracking-[0.25em] text-stone-500 mb-1.5"
+  }, "Supervisor Signature"), /*#__PURE__*/React.createElement("div", {
+    className: "h-20 print:h-14 border-b border-stone-400"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "mt-2 flex items-baseline gap-3"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] uppercase tracking-[0.25em] text-stone-500 shrink-0"
+  }, "Date"), /*#__PURE__*/React.createElement("div", {
+    className: "flex-1 max-w-[160px] border-b border-stone-300 h-4"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "mt-2 text-[10px] uppercase tracking-[0.25em] text-stone-400"
+  }, "Name"))), /*#__PURE__*/React.createElement("footer", {
+    className: "mt-6 print:mt-4 pt-2 border-t border-stone-200 flex items-center justify-between text-[9px] uppercase tracking-[0.25em] text-stone-400"
+  }, /*#__PURE__*/React.createElement("span", null, "Tomorrow Biostasis GmbH"), /*#__PURE__*/React.createElement("span", {
+    className: "tabular"
+  }, "Page 1 / 1"))));
+}
+
+// --- Main App ---
+function App() {
+  const [employees, setEmployees] = useState([{
+    id: gen(),
+    name: ''
+  }]);
+  const [period, setPeriod] = useState('');
+  const [entries, setEntries] = useState([createEntry()]);
+  const [calculated, setCalculated] = useState(false);
+  function createEntry() {
+    return {
+      id: gen(),
+      date: '',
+      ms: '',
+      me: '',
+      as: '',
+      ae: ''
+    };
+  }
+
+  // --- Time calculations (tolerant to 24h and 12h AM/PM formats) ---
+  const parseTime = t => {
+    if (!t) return null;
+    const m = String(t).trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+    if (!m) return null;
+    let hours = parseInt(m[1], 10);
+    const mins = parseInt(m[2], 10);
+    const ampm = m[3] ? m[3].toUpperCase() : null;
+    if (isNaN(hours) || isNaN(mins)) return null;
+    if (ampm === 'AM' && hours === 12) hours = 0;else if (ampm === 'PM' && hours !== 12) hours += 12;
+    return hours * 60 + mins;
+  };
+  const entryMinutes = e => {
+    const ms = parseTime(e.ms);
+    const me = parseTime(e.me);
+    const as = parseTime(e.as);
+    const ae = parseTime(e.ae);
+    let total = 0;
+    if (ms !== null && me !== null && me > ms) total += me - ms;
+    if (as !== null && ae !== null && ae > as) total += ae - as;
+    return total;
+  };
+  const fmtHM = mins => {
+    if (!mins) return '—';
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return `${h}:${m.toString().padStart(2, '0')}`;
+  };
+  const decimalH = mins => (mins / 60).toFixed(2);
+  const weekday = dateStr => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d)) return '';
+    return d.toLocaleDateString('en-GB', {
+      weekday: 'short'
+    });
+  };
+  const totalMinutes = entries.reduce((s, e) => s + entryMinutes(e), 0);
+
+  // --- Entry ops ---
+  const addEntry = () => {
+    setCalculated(false);
+    setEntries(prev => [...prev, createEntry()]);
+  };
+  const removeEntry = id => {
+    setCalculated(false);
+    setEntries(prev => prev.length === 1 ? [createEntry()] : prev.filter(e => e.id !== id));
+  };
+  const updateEntry = (id, field, val) => {
+    setCalculated(false);
+    setEntries(prev => prev.map(e => e.id === id ? {
+      ...e,
+      [field]: val
+    } : e));
+  };
+
+  // --- Employee ops ---
+  const addEmployee = () => setEmployees(prev => [...prev, {
+    id: gen(),
+    name: ''
+  }]);
+  const removeEmployee = id => {
+    setEmployees(prev => prev.length === 1 ? [{
+      id: gen(),
+      name: ''
+    }] : prev.filter(e => e.id !== id));
+  };
+  const updateEmployee = (id, name) => {
+    setEmployees(prev => prev.map(e => e.id === id ? {
+      ...e,
+      name
+    } : e));
+  };
+  const multi = employees.length > 1;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "min-h-screen w-full bg-stone-100 print:bg-white"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "ts-root max-w-4xl mx-auto px-4 py-6 md:py-10 text-stone-900"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "no-print flex flex-wrap items-center justify-between gap-3 mb-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-[10px] uppercase tracking-[0.25em] text-stone-500"
+  }, "Timesheet \xB7 Tomorrow Biostasis"), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-2 items-center"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: addEntry,
+    className: "inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] uppercase tracking-[0.15em] border border-stone-300 text-stone-700 hover:border-stone-900 hover:text-stone-900 transition-colors"
+  }, /*#__PURE__*/React.createElement(IconPlus, null), " Add day"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setCalculated(true),
+    className: `inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] uppercase tracking-[0.15em] border transition-colors ${calculated ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-stone-900 text-stone-900 hover:bg-stone-900 hover:text-white'}`
+  }, calculated ? /*#__PURE__*/React.createElement(IconCheck, null) : /*#__PURE__*/React.createElement(IconCalc, null), calculated ? 'Calculated' : 'Calculate hours'), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setCalculated(true);
+      setTimeout(() => window.print(), 50);
+    },
+    disabled: !calculated,
+    className: `inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] uppercase tracking-[0.15em] transition-colors ${calculated ? 'bg-stone-900 text-white hover:bg-black' : 'bg-stone-300 text-stone-500 cursor-not-allowed'}`,
+    title: calculated ? 'Print / save PDF' : 'Click Calculate hours first'
+  }, /*#__PURE__*/React.createElement(IconPrinter, null), " Print / Save PDF"))), /*#__PURE__*/React.createElement("div", {
+    className: "no-print bg-white border border-stone-200 p-5 mb-5"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between mb-3"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2 text-[10px] uppercase tracking-[0.25em] text-stone-500"
+  }, /*#__PURE__*/React.createElement(IconUser, null), " Employees"), /*#__PURE__*/React.createElement("div", {
+    className: "text-[10px] uppercase tracking-[0.25em] text-stone-400 tabular"
+  }, employees.length, " sheet", employees.length !== 1 ? 's' : '', " \xB7 same times")), /*#__PURE__*/React.createElement("div", {
+    className: "space-y-2"
+  }, employees.map((emp, i) => /*#__PURE__*/React.createElement("div", {
+    key: emp.id,
+    className: "flex items-center gap-3"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-stone-400 text-[11px] tabular w-5 text-right"
+  }, i + 1), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    value: emp.name,
+    onChange: e => updateEmployee(emp.id, e.target.value),
+    placeholder: `Employee ${i + 1} name`,
+    className: "flex-1 bg-transparent border-b border-stone-300 focus:border-stone-900 outline-none py-1 text-sm text-stone-900 placeholder:text-stone-300"
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: () => removeEmployee(emp.id),
+    className: "text-stone-400 hover:text-red-600 p-1 transition",
+    title: "Remove employee"
+  }, /*#__PURE__*/React.createElement(IconX, null))))), /*#__PURE__*/React.createElement("button", {
+    onClick: addEmployee,
+    className: "mt-3 inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.15em] text-stone-600 hover:text-stone-900"
+  }, /*#__PURE__*/React.createElement(IconPlus, {
+    size: 11
+  }), " Add another employee"), multi && /*#__PURE__*/React.createElement("p", {
+    className: "mt-3 text-[11px] text-stone-500 leading-relaxed"
+  }, "On print, one A4 page will be generated per employee, each with the same dates and times entered below.")), employees.map((emp, idx) => {
+    const isLast = idx === employees.length - 1;
+    const isFirst = idx === 0;
+    return /*#__PURE__*/React.createElement("div", {
+      key: emp.id,
+      className: `${isFirst ? '' : 'hidden only-print'} ${!isLast ? 'sheet-break' : ''} ${isFirst ? '' : 'mt-0'}`
+    }, /*#__PURE__*/React.createElement(TimesheetSheet, {
+      employee: emp,
+      updateEmployeeName: name => updateEmployee(emp.id, name),
+      period: period,
+      setPeriod: setPeriod,
+      entries: entries,
+      addEntry: addEntry,
+      removeEntry: removeEntry,
+      updateEntry: updateEntry,
+      entryMinutes: entryMinutes,
+      totalMinutes: totalMinutes,
+      fmtHM: fmtHM,
+      decimalH: decimalH,
+      weekday: weekday,
+      readOnly: !isFirst
+    }));
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "no-print mt-6 text-center text-[11px] text-stone-400 leading-relaxed"
+  }, calculated ? multi ? `${employees.length} A4 pages ready — one per employee. Click Print / Save PDF.` : 'Hours calculated. Click Print / Save PDF when ready.' : 'Fill in the days and times, then click Calculate hours before printing.')));
+}
+ReactDOM.createRoot(document.getElementById('root')).render(/*#__PURE__*/React.createElement(App, null));
+    </script>
+  </body>
+</html>
